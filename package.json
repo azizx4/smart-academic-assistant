@@ -1,0 +1,17 @@
+{
+  "name": "sara-monorepo",
+  "version": "1.0.0",
+  "description": "SARA - Smart Academic Read-Only Assistant",
+  "private": true,
+  "scripts": {
+    "install:all": "cd server && npm install && cd ../client && npm install",
+    "build": "cd client && npm run build",
+    "start": "cd server && node src/index.js",
+    "postinstall": "cd server && npx prisma generate",
+    "migrate": "cd server && npx prisma migrate deploy",
+    "seed": "cd server && node prisma/seed.js"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "name": "sara-server",
+  "version": "0.1.0",
+  "description": "SARA - Smart Academic Read-Only Assistant (Backend)",
+  "main": "src/index.js",
+  "scripts": {
+    "dev": "node --watch src/index.js",
+    "start": "node src/index.js",
+    "seed": "node prisma/seed.js",
+    "test": "node --experimental-vm-modules node_modules/.bin/vitest run",
+    "test:watch": "node --experimental-vm-modules node_modules/.bin/vitest"
+  },
+  "keywords": ["academic", "assistant", "read-only"],
+  "license": "MIT",
+  "type": "module",
+  "dependencies": {
+    "@prisma/client": "^6.9.0",
+    "bcrypt": "^5.1.1",
+    "cors": "^2.8.5",
+    "dotenv": "^16.5.0",
+    "express": "^4.21.0",
+    "express-rate-limit": "^7.5.0",
+    "jsonwebtoken": "^9.0.2",
+    "helmet": "^8.1.0"
+  },
+  "devDependencies": {
+    "prisma": "^6.9.0",
+    "vitest": "^3.2.1",
+    "supertest": "^7.1.0"
+  }
+}

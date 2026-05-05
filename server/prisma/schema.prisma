@@ -1,0 +1,199 @@
+// ==============================================
+// SARA — Prisma Schema
+// All academic entities + RBAC
+// Database: SQLite (dev) / PostgreSQL (prod)
+// ==============================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// Railway/Production: PostgreSQL
+// Local dev: change to "sqlite" and use DATABASE_URL="file:./dev.db"
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ------------------------------------------
+// Users (students + faculty)
+// ------------------------------------------
+model User {
+  id           Int      @id @default(autoincrement())
+  username     String   @unique
+  passwordHash String   @map("password_hash")
+  role         String   // "student" | "faculty"
+  nameAr       String   @map("name_ar")
+  nameEn       String   @map("name_en")
+  email        String?
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  // Relations
+  enrollments  Enrollment[]
+  courses      Course[]     @relation("FacultyCourses")
+  absences     Absence[]
+  alerts       Alert[]
+  academicPlan AcademicPlan[]
+
+  @@map("users")
+}
+
+// ------------------------------------------
+// Courses
+// ------------------------------------------
+model Course {
+  id        Int      @id @default(autoincrement())
+  code      String   @unique
+  nameAr    String   @map("name_ar")
+  nameEn    String   @map("name_en")
+  creditHrs Int      @map("credit_hours")
+  semester  String   // e.g. "2025-2"
+  facultyId Int      @map("faculty_id")
+
+  // Relations
+  faculty     User         @relation("FacultyCourses", fields: [facultyId], references: [id])
+  enrollments Enrollment[]
+  absences    Absence[]
+  grades      Grade[]
+  schedules   Schedule[]
+
+  @@map("courses")
+}
+
+// ------------------------------------------
+// Enrollment (student <-> course)
+// ------------------------------------------
+model Enrollment {
+  id        Int  @id @default(autoincrement())
+  studentId Int  @map("student_id")
+  courseId   Int  @map("course_id")
+
+  student User   @relation(fields: [studentId], references: [id])
+  course  Course @relation(fields: [courseId], references: [id])
+
+  @@unique([studentId, courseId])
+  @@map("enrollments")
+}
+
+// ------------------------------------------
+// Grades
+// ------------------------------------------
+model Grade {
+  id         Int    @id @default(autoincrement())
+  studentId  Int    @map("student_id")
+  courseId    Int    @map("course_id")
+  midterm    Float?
+  final      Float?
+  assignments Float?
+  total      Float?
+  letterGrade String? @map("letter_grade")
+
+  course Course @relation(fields: [courseId], references: [id])
+
+  @@unique([studentId, courseId])
+  @@map("grades")
+}
+
+// ------------------------------------------
+// Absences
+// ------------------------------------------
+model Absence {
+  id        Int      @id @default(autoincrement())
+  studentId Int      @map("student_id")
+  courseId   Int      @map("course_id")
+  date      DateTime
+  reason    String?
+
+  student User   @relation(fields: [studentId], references: [id])
+  course  Course @relation(fields: [courseId], references: [id])
+
+  @@map("absences")
+}
+
+// ------------------------------------------
+// Schedule
+// ------------------------------------------
+model Schedule {
+  id        Int    @id @default(autoincrement())
+  courseId   Int    @map("course_id")
+  dayOfWeek String @map("day_of_week") // "Sunday" | "Monday" | ...
+  startTime String @map("start_time")  // "08:00"
+  endTime   String @map("end_time")    // "09:30"
+  room      String
+
+  course Course @relation(fields: [courseId], references: [id])
+
+  @@map("schedules")
+}
+
+// ------------------------------------------
+// Academic Plan
+// ------------------------------------------
+model AcademicPlan {
+  id          Int    @id @default(autoincrement())
+  studentId   Int    @map("student_id")
+  courseCode   String @map("course_code")
+  courseNameAr String @map("course_name_ar")
+  semester    String // planned semester
+  status      String // "completed" | "in_progress" | "remaining"
+
+  student User @relation(fields: [studentId], references: [id])
+
+  @@map("academic_plans")
+}
+
+// ------------------------------------------
+// Alerts (per-student notifications)
+// ------------------------------------------
+model Alert {
+  id        Int      @id @default(autoincrement())
+  studentId Int      @map("student_id")
+  title     String
+  body      String
+  type      String   // "warning" | "info" | "urgent"
+  isRead    Boolean  @default(false) @map("is_read")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  student User @relation(fields: [studentId], references: [id])
+
+  @@map("alerts")
+}
+
+// ------------------------------------------
+// Chat Audit Log (monitoring & security)
+// ------------------------------------------
+model ChatAuditLog {
+  id          Int      @id @default(autoincrement())
+  userId      Int      @map("user_id")
+  username    String
+  userRole    String   @map("user_role")
+  message     String   // user's original message
+  response    String?  // AI response (truncated)
+  intent      String?  // detected intent or tool called
+  toolCalled  String?  @map("tool_called")
+  blocked     Boolean  @default(false) // true if write attempt or unauthorized
+  blockReason String?  @map("block_reason")
+  provider    String?  // "gemini" | "openai" | "legacy"
+  responseMs  Int?     @map("response_ms") // response time in milliseconds
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@index([blocked])
+  @@index([createdAt])
+  @@map("chat_audit_logs")
+}
+
+// ------------------------------------------
+// News (university-wide, public)
+// ------------------------------------------
+model News {
+  id          Int      @id @default(autoincrement())
+  titleAr     String   @map("title_ar")
+  titleEn     String?  @map("title_en")
+  bodyAr      String   @map("body_ar")
+  bodyEn      String?  @map("body_en")
+  category    String   // "news" | "competition" | "announcement"
+  publishedAt DateTime @default(now()) @map("published_at")
+
+  @@map("news")
+}

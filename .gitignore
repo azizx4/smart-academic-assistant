@@ -1,0 +1,59 @@
+# Dependencies
+node_modules/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Database
+*.db
+*.db-journal
+
+# Build outputs
+client/dist/
+server/dist/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Coverage
+coverage/
+
+# Prisma
+server/prisma/*.db
+server/prisma/*.db-journal
+
+# Loose dev scripts (root)
+*.ps1
+*.zip
+claude-extract.txt
+config-index.js
+config_index.js
+factory.js
+gemini.provider.js
+system-prompt.js
+/chat.service.js
+ChatWidget.jsx
+WidgetDemoPage.jsx
+
+# Duplicate docs in root
+/architecture.md
+/implementation_plan.md
+/project_overview.md
+/requirements.md
+/security_policies.md
+
+# Claude settings
+.claude/
