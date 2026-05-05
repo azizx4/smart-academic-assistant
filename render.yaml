@@ -4,7 +4,7 @@ services:
     runtime: node
     region: frankfurt
     plan: free
-    buildCommand: cd server && npm install && npx prisma generate && cd ../client && npm install --production=false && npx vite build
+    buildCommand: cd server && npm install && npx prisma generate && npx prisma migrate deploy && node prisma/seed.js && cd ../client && npm install --production=false && npx vite build
     startCommand: cd server && npx prisma migrate deploy && node src/index.js
     envVars:
       - key: NODE_ENV
