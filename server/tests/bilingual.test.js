@@ -262,21 +262,21 @@ describe("English-only — Fallback Formatter", () => {
     const chat = await loadChat();
     const r = await chat("what courses do I teach?", { id: 1, role: "faculty", username: "f1" });
     expect(r.reply).toMatch(/Programming/);
-    expect(r.reply).toMatch(/students/);
+    expect(r.reply).toMatch(/students/i);
   });
 
   it("English faculty absences → English output", async () => {
     const chat = await loadChat();
     const r = await chat("who has too many absences?", { id: 1, role: "faculty", username: "f1" });
     expect(r.reply).toMatch(/Salem/);
-    expect(r.reply).toMatch(/absences/);
+    expect(r.reply).toMatch(/absences/i);
   });
 
   it("Arabic faculty courses → English output", async () => {
     const chat = await loadChat();
     const r = await chat("وش المواد اللي ادرسها", { id: 1, role: "faculty", username: "f1" });
     expect(r.reply).toMatch(/Programming/);
-    expect(r.reply).toMatch(/students/);
+    expect(r.reply).toMatch(/students/i);
   });
 });
 

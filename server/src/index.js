@@ -33,6 +33,7 @@ import newsRoutes from "./routes/news.routes.js";
 import facultyRoutes from "./routes/faculty.routes.js";
 import auditLogRoutes from "./routes/audit-log.routes.js";
 
+
 const app = express();
 
 // ------------------------------------------
@@ -40,6 +41,7 @@ const app = express();
 // ------------------------------------------
 app.use(helmet());
 app.use(cors({ origin: config.corsOrigin, credentials: true }));
+
 app.use(express.json({ limit: "1mb" }));
 app.use(config.apiPrefix, generalLimiter);
 

@@ -37,6 +37,7 @@ export async function getStudentSchedule(studentId) {
         courseNameAr: e.course.nameAr,
         courseNameEn: e.course.nameEn,
         facultyNameAr: e.course.faculty.nameAr,
+        facultyNameEn: e.course.faculty.nameEn,
         dayOfWeek: s.dayOfWeek,
         startTime: s.startTime,
         endTime: s.endTime,

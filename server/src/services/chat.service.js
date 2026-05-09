@@ -34,6 +34,7 @@ import { getStudentPlan } from "./plan.service.js";
 import { getStudentAlerts } from "./alert.service.js";
 import { getNews } from "./news.service.js";
 import { getFacultyCourses } from "./faculty.service.js";
+import { translateAlertTitle, translateAlertBody } from "./alert-translation.js";
 
 const prisma = new PrismaClient();
 
@@ -215,7 +216,7 @@ function isWriteAttempt(msg) {
   // spaces, punctuation, or message boundaries) — avoids false
   // positives like "معدلي" (GPA) matching the root "عدل" (modify).
   const arabicStandalone = /(^|[\s،.؟!])(احذف|امسح|اضف|أضف|اضيف|ارفع|ادخل|سجل|الغي|ألغي|عدّل|غيّر|حذف|تعديل|أبي أسجل|ابي اسجل|سجلني|ضيف|بدّل|حوّل|شيل|نزّل|ارسل|ابي ادخل|ابي أضيف)([\s،.؟!]|$)/i;
-  const english = /\b(update|modify|delete|edit|drop\s+course|unenroll|enroll|remove|change\s+my|register|add\s+course|withdraw|swap\s+course|switch\s+section|cancel|sign\s+(me\s+)?up|submit|upload|post|create|insert|put|write|save|store)\b/i;
+  const english = /\b(update|modify|delete|edit|drop\s+course|unenroll|enroll|remove|change\s+(my|a|the|student)|register|add\s+course|withdraw|swap\s+course|switch\s+section|cancel|sign\s+(me\s+)?up|submit|upload|post|create|insert|put|write|save|store)\b/i;
   return arabicStandalone.test(msg) || english.test(msg);
 }
 function isUnavailableFeature(msg) {
@@ -239,13 +240,34 @@ function fallbackUnknown(name) {
 // layer or function-calling is unavailable.
 // ==============================================
 async function runLegacyFlow(message, user, userName, provider) {
-  const intent = detectIntent(message, user.role);
+  const allIntents = detectAllIntents(message, user.role);
+  const intent = allIntents[0] || "unknown";
 
   if (intent === "overall_status") {
     return await handleOverallStatus(user, userName);
   }
   if (intent === "unknown") {
     return { reply: fallbackUnknown(userName), intent: "unknown" };
+  }
+
+  // Multi-intent: if user asked for multiple things, gather all data
+  if (allIntents.length > 1) {
+    const allData = {};
+    for (const i of allIntents) {
+      allData[i] = await fetchDataForIntent(i, user);
+    }
+    const context = {
+      role: user.role, userName, dataType: allIntents.join("+"), data: allData, lang: "en",
+    };
+    try {
+      const reply = await provider.generateResponse(message, context, SYSTEM_PROMPT);
+      return { reply, intent: allIntents.join(",") };
+    } catch (err) {
+      console.error("[CHAT] Legacy multi-intent AI error:", err.message);
+      // Fallback: format each intent separately
+      const parts = allIntents.map((i) => formatFallback(i, allData[i], userName));
+      return { reply: parts.join("\n\n---\n\n"), intent: allIntents.join(","), fallback: true };
+    }
   }
 
   const data = await fetchDataForIntent(intent, user);
@@ -297,6 +319,20 @@ function detectIntent(message, role) {
   return "unknown";
 }
 
+function detectAllIntents(message, role) {
+  const found = [];
+  for (const p of INTENT_PATTERNS) {
+    if (p.roleRequired && p.roleRequired !== role) continue;
+    for (const r of p.patterns) {
+      if (r.test(message)) {
+        if (!found.includes(p.intent)) found.push(p.intent);
+        break;
+      }
+    }
+  }
+  return found;
+}
+
 async function fetchDataForIntent(intent, user) {
   switch (intent) {
     case "grades": {
@@ -316,97 +352,97 @@ async function fetchDataForIntent(intent, user) {
   }
 }
 
-// ==============================================
-// Alert translation helpers (seed generates Arabic-only alerts)
-// ==============================================
-function translateAlertTitle(title) {
-  const map = {
-    "تنبيه غياب": "Absence Warning",
-    "إنذار غياب - خطر الحرمان": "Absence Alert — Denial Risk",
-    "تنبيه درجات": "Grade Warning",
-    "موعد الاختبارات النهائية": "Final Exams Schedule",
-  };
-  return map[title] || title;
-}
-
-function translateAlertBody(body) {
-  return body
-    .replace(/لديك (\d+) غيابات في مقرر (.+?)\. الحد الأقصى المسموح (\d+) غيابات\./,
-      (_, count, course, max) => `You have ${count} absences in ${course}. Maximum allowed: ${max}.`)
-    .replace(/تجاوزت الحد المسموح للغياب في مقرر (.+?)\. عدد الغيابات: (\d+)\. يرجى مراجعة شؤون الطلاب\./,
-      (_, course, count) => `You exceeded the absence limit in ${course}. Absences: ${count}. Please contact Student Affairs.`)
-    .replace(/درجتك في مقرر (.+?) أقل من الحد الأدنى للنجاح \((\d+)\/100\)\./,
-      (_, course, score) => `Your grade in ${course} is below passing (${score}/100).`)
-    .replace(/تبدأ الاختبارات النهائية يوم (.+?)\. يرجى مراجعة الجدول على البوابة الأكاديمية\./,
-      (_, date) => `Final exams start on ${date}. Please check the schedule on the academic portal.`);
-}
+// Alert translation helpers are in ./alert-translation.js
+// (separated to avoid circular dependency with tools/alerts.tool.js)
 
 function formatFallback(intent, data, name) {
   switch (intent) {
     case "grades": {
       if (!data?.grades?.length) return `${name}, no grades found.`;
-      let t = `Your grades, ${name}:\n\n`;
+      let t = `**Your Grades, ${name}:**\n\n`;
+      t += `| Course | Total | Grade |\n`;
+      t += `| :--- | :---: | :---: |\n`;
+      const failing = [];
       for (const g of data.grades) {
-        t += `• ${g.courseNameEn || g.courseCode} (${g.courseCode}): ${g.total}/100 — ${g.letterGrade}\n`;
+        const cn = `${g.courseNameEn || g.courseCode} (${g.courseCode})`;
+        if (g.letterGrade === "F") failing.push(g.courseNameEn || g.courseCode);
+        t += `| ${cn} | ${g.total} | ${g.letterGrade} |\n`;
       }
-      t += `\nGPA: ${data.gpa.gpa} / 4.0`;
+      t += `\n**GPA:** ${data.gpa.gpa} / 4.0 (${data.gpa.totalCredits} credits)`;
+      if (failing.length > 0) t += `\n\n⚠️ Failing: ${failing.join(", ")}`;
       return t;
     }
     case "absences": {
-      if (!data?.length) return `${name}, you have no absences.`;
-      let t = `Your absences, ${name}:\n\n`;
+      if (!data?.length) return `${name}, you have no absences!`;
+      const LIMIT = 5;
+      let t = `**Your Absences, ${name}:**\n\n`;
+      t += `| Course | Count | Status |\n`;
+      t += `| :--- | :---: | :--- |\n`;
       for (const c of data) {
-        t += `• ${c.courseNameEn || c.courseCode} (${c.courseCode}): ${c.totalAbsences} absence(s)\n`;
+        const cn = `${c.courseNameEn || c.courseCode} (${c.courseCode})`;
+        const abs = c.totalAbsences;
+        const status = abs >= LIMIT ? "⛔ Denied" : abs >= LIMIT - 1 ? "⚠️ Risk" : "✅ OK";
+        t += `| ${cn} | ${abs} | ${status} |\n`;
       }
+      t += `\nLimit: ${LIMIT} absences per course.`;
       return t;
     }
     case "schedule":
     case "student_courses": {
       if (!data?.length) return `${name}, no schedule found.`;
-      let t = `Your schedule, ${name}:\n\n`;
-      let day = "";
+      let t = `**Your Schedule, ${name}:**\n\n`;
+      t += `| Day | Time | Course | Room |\n`;
+      t += `| :--- | :--- | :--- | :--- |\n`;
       for (const s of data) {
-        if (s.dayOfWeek !== day) { day = s.dayOfWeek; t += `\n${day}:\n`; }
-        t += `  ${s.startTime}-${s.endTime} | ${s.courseNameEn || s.courseCode} | ${s.room}\n`;
+        t += `| ${s.dayOfWeek} | ${s.startTime}-${s.endTime} | ${s.courseNameEn || s.courseCode} | ${s.room} |\n`;
       }
       return t;
     }
     case "plan": {
       if (!data) return `${name}, no plan found.`;
-      return `Your plan, ${name}:\nCompleted: ${data.summary.completed}\nIn progress: ${data.summary.inProgress}\nRemaining: ${data.summary.remaining}`;
+      const { completed, inProgress, remaining } = data.summary;
+      const total = completed + inProgress + remaining;
+      const pct = total > 0 ? Math.round((completed / total) * 100) : 0;
+      let t = `**Academic Plan, ${name}:**\n\n`;
+      t += `| Status | Count |\n| :--- | :---: |\n`;
+      t += `| ✅ Completed | ${completed} |\n| 📚 In Progress | ${inProgress} |\n| 📋 Remaining | ${remaining} |\n`;
+      t += `\n**Progress:** ${pct}% (${completed}/${total})`;
+      if (data.inProgress?.length) {
+        t += `\n\n**In Progress:**\n\n| Course | Code | Semester |\n| :--- | :--- | :--- |\n`;
+        for (const c of data.inProgress) t += `| ${c.courseNameEn || c.courseNameAr} | ${c.courseCode} | ${c.semester} |\n`;
+      }
+      return t;
     }
     case "alerts": {
       if (!data?.alerts?.length) return `${name}, no alerts.`;
-      let t = `Your alerts (${data.unreadCount} unread):\n\n`;
+      let t = `**Your Alerts** (${data.unreadCount} unread):\n\n`;
+      t += `| Alert | Details |\n| :--- | :--- |\n`;
       for (const a of data.alerts) {
         const icon = a.type === "urgent" ? "🚨" : a.type === "warning" ? "⚠️" : "ℹ️";
-        const title = translateAlertTitle(a.title);
-        const body = translateAlertBody(a.body);
-        t += `${icon} ${title}\n   ${body}\n\n`;
+        t += `| ${icon} ${a.titleEn || translateAlertTitle(a.title)} | ${a.bodyEn || translateAlertBody(a.body)} |\n`;
       }
       return t;
     }
     case "news": {
       if (!data?.length) return "No news available.";
-      let t = "Latest news:\n\n";
-      for (const n of data) t += `📰 ${n.titleEn || n.titleAr}\n\n`;
+      let t = `**Latest News:**\n\n`;
+      t += `| Title | Category |\n| :--- | :--- |\n`;
+      for (const n of data) t += `| ${n.titleEn || n.titleAr} | ${n.category} |\n`;
       return t;
     }
     case "faculty_courses": {
       if (!data?.length) return `${name}, no courses found.`;
-      let t = `Your courses, ${name}:\n\n`;
-      for (const c of data) {
-        t += `• ${c.nameEn || c.code} (${c.code}) — ${c.enrolledStudents} students\n`;
-      }
+      let t = `**Your Courses, ${name}:**\n\n`;
+      t += `| Course | Code | Students |\n| :--- | :--- | :---: |\n`;
+      for (const c of data) t += `| ${c.nameEn || c.code} | ${c.code} | ${c.enrolledStudents} |\n`;
       return t;
     }
     case "faculty_absences": {
       if (!data?.length) return `${name}, no students exceeded the limit.`;
-      let t = `Students exceeding absence limit, ${name}:\n\n`;
-      for (const s of data) {
-        t += `⚠️ ${s.student.nameEn || s.student.nameAr} — ${s.course.nameEn || s.course.code} (${s.course.code}): ${s.absenceCount} absences\n`;
-      }
-      t += `\nTotal: ${data.length} student(s)`;
+      let t = `**Students Exceeding Absence Limit:**\n\n`;
+      t += `| Student | Course | Absences |\n| :--- | :--- | :---: |\n`;
+      for (const s of data) t += `| ${s.student.nameEn || s.student.nameAr} | ${s.course.nameEn || s.course.code} (${s.course.code}) | ${s.absenceCount} |\n`;
+      t += `\n**Total:** ${data.length} student(s)`;
       return t;
     }
     default: return `Sorry, type "help" for available services.`;

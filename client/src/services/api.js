@@ -74,3 +74,4 @@ export async function sendMessage(message) {
     body: JSON.stringify({ message }),
   });
 }
+

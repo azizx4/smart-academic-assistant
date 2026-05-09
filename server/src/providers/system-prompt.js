@@ -66,7 +66,19 @@ export const TOOL_SYSTEM_PROMPT = `You are "SARA" (Smart Academic Read-Only Assi
 - Always respond in English, even if the user asks in Arabic.
 - Friendly, concise, and professional.
 - Understand Saudi dialect: وش، ابي، عطني، وريني، توريني، كم، وين، متى، ليه، مين.
-- Format data clearly (bullets/bold) and gently flag low grades or high absences.`;
+- **MANDATORY: Use compact markdown tables for ALL structured data.** The chat widget is narrow (~350px), so keep tables to 3-4 columns max. Never use bullet lists for tabular data. Column guidelines:
+  - Grades → **Course | Total | Grade** (combine code into course name, omit midterm/final/assignments breakdown)
+  - Schedule → **Day | Time | Course | Room**
+  - Absences → **Course | Count | Status**
+  - Plan → **Course | Status | Semester**
+  - Courses (faculty) → **Course | Code | Students**
+  - Alerts → **Alert | Details**
+- After the table, add a brief note (GPA summary, warnings, etc.).
+- **When multiple tools are called**: present ALL results — each section with a header and its own compact table.
+
+## Bilingual alert data:
+- Alert objects contain both Arabic (\`title\`, \`body\`) and English (\`titleEn\`, \`bodyEn\`) fields.
+- **Always use the English fields** (\`titleEn\`, \`bodyEn\`) when presenting alerts, since you respond in English.`;
 
 export const INTENT_PATTERNS = [
   {
@@ -84,6 +96,7 @@ export const INTENT_PATTERNS = [
       /how did i do/i, /what did i get/i, /my performance/i, /academic record/i,
       /show.*grades/i, /what'?s my gpa/i, /whats my gpa/i, /check.*grades/i,
       /how are my grades/i, /am i passing/i, /did i pass/i, /did i fail/i,
+      /am i failing/i, /failing any/i, /any course.*fail/i,
       /final grade/i, /midterm grade/i, /my marks/i, /report card/i,
     ],
     description: "grades",
@@ -132,6 +145,7 @@ export const INTENT_PATTERNS = [
       /next lecture/i, /what room/i, /which building/i, /when do i start/i,
       /class times/i, /daily schedule/i, /weekly schedule/i,
       /what'?s on monday/i, /what'?s on sunday/i,
+      /which day.*most/i, /most classes/i, /busiest day/i, /heaviest day/i,
     ],
     description: "schedule",
   },
@@ -145,12 +159,14 @@ export const INTENT_PATTERNS = [
       /كم ترم باقي/i, /متى بتخرج/i, /الخطة الدراسيه/i, /وش المواد الباقيه/i,
       /كم ماده خلصت/i, /تقدمي الأكاديمي/i, /نسبة الإنجاز/i,
       /كم أنجزت/i, /وش اللي قطعته/i, /خطة تخرجي/i,
-      /plan/i, /remaining/i, /graduation/i, /credits.*left/i,
+      /plan/i, /remaining/i, /graduat/i, /credits.*left/i,
       /degree plan/i, /study plan/i, /how many courses left/i,
       /when will i graduate/i, /when do i graduate/i, /graduation plan/i,
       /remaining courses/i, /courses left/i, /what'?s left/i,
       /how close to graduating/i, /degree progress/i, /degree audit/i,
       /academic plan/i, /how many semesters left/i, /credit hours remaining/i,
+      /courses.*left.*graduat/i, /left to graduate/i, /how many courses.*left/i,
+      /courses.*remaining/i, /courses.*to complete/i, /courses do i have left/i,
     ],
     description: "plan",
     roleRequired: "student",
@@ -221,6 +237,7 @@ export const INTENT_PATTERNS = [
       /how many students/i, /class list/i, /my sections/i,
       /which courses/i, /what am i teaching/i, /teaching schedule/i,
       /\broster\b/i, /class roster/i, /student list/i, /enrollment list/i,
+      /students? in [A-Z]/i, /show.*students/i, /list.*students/i,
     ],
     description: "faculty courses",
     roleRequired: "faculty",
@@ -243,6 +260,7 @@ export const INTENT_PATTERNS = [
       /who'?s been absent a lot/i, /who needs warning/i, /students above limit/i,
       /high absence/i, /flagged students/i, /at risk of denial/i,
       /who might fail attendance/i, /students to watch/i, /too many absences/i,
+      /at.risk student/i, /who.*at.risk/i, /my at.risk/i,
     ],
     description: "faculty absences",
     roleRequired: "faculty",

@@ -3,7 +3,7 @@ import { sendMessage, login as apiLogin, clearToken, setToken } from "../service
 import ChatMessage from "./ChatMessage";
 import TypingIndicator from "./TypingIndicator";
 
-export default function ChatWidget({ token: externalToken, user: externalUser }) {
+export default function ChatWidget({ token: externalToken, user: externalUser, lang: portalLang }) {
   const [isOpen, setIsOpen] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [user, setUser] = useState(null);
@@ -14,8 +14,10 @@ export default function ChatWidget({ token: externalToken, user: externalUser })
   const [loginError, setLoginError] = useState("");
   const [loginLoading, setLoginLoading] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [isListening, setIsListening] = useState(false);
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
+  const recognitionRef = useRef(null);
 
   // Auto-login if token and user are provided externally
   useEffect(() => {
@@ -61,6 +63,96 @@ export default function ChatWidget({ token: externalToken, user: externalUser })
   };
 
   const handleKeyDown = (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } };
+
+  const SR = typeof window !== "undefined" && (window.SpeechRecognition || window.webkitSpeechRecognition);
+
+  // Auto-correct common misrecognitions for academic commands
+  const correctTranscript = (text) => {
+    const lower = text.toLowerCase().trim();
+    const corrections = [
+      // English corrections
+      [/xiaomi|show\s*me/i, "show me"],
+      [/migrate|my\s*great|my\s*grate/i, "my grades"],
+      [/my\s*grid/i, "my grades"],
+      [/shedule|shejule|my\s*shed/i, "my schedule"],
+      [/absence|absent|absens/i, "absences"],
+      [/my\s*alert/i, "my alerts"],
+      [/my\s*plan/i, "my plan"],
+      [/my\s*course/i, "my courses"],
+    ];
+    let result = text;
+    for (const [pattern, replacement] of corrections) {
+      result = result.replace(pattern, replacement);
+    }
+    return result;
+  };
+
+  const stopListening = () => {
+    try { recognitionRef.current?.abort(); } catch {}
+    recognitionRef.current = null;
+    setIsListening(false);
+  };
+
+  const toggleListening = () => {
+    if (isListening) { stopListening(); return; }
+    if (!SR) {
+      setMessages((p) => [...p, { role: "assistant", content: "Voice input is not supported in this browser. Please use Chrome or Edge." }]);
+      return;
+    }
+
+    const rec = new SR();
+    rec.continuous = false;
+    rec.interimResults = true;
+    rec.maxAlternatives = 3;
+    rec.lang = portalLang === "en" ? "en-US" : "ar-SA";
+
+    rec.onresult = (e) => {
+      let final = "";
+      let interim = "";
+      for (let i = 0; i < e.results.length; i++) {
+        const r = e.results[i];
+        if (r.isFinal) {
+          // Pick best alternative
+          let best = r[0].transcript;
+          for (let j = 1; j < r.length; j++) {
+            // Prefer alternatives that contain academic keywords
+            const alt = r[j].transcript.toLowerCase();
+            if (/grade|schedule|absence|alert|plan|course|news|gpa|درج|جدول|غياب|خطة|مواد/.test(alt)) {
+              best = r[j].transcript;
+              break;
+            }
+          }
+          final += best;
+        } else {
+          interim = r[0].transcript;
+        }
+      }
+      setInput(correctTranscript(final || interim));
+    };
+
+    rec.onerror = (e) => {
+      console.error("[VOICE] Error:", e.error);
+      const msgs = {
+        "not-allowed": "Microphone blocked. Allow microphone in browser settings.",
+        "network": "Speech service unavailable. Try Chrome or Edge.",
+        "no-speech": "No speech detected. Try again.",
+        "aborted": null,
+      };
+      const msg = msgs[e.error] ?? `Voice error: ${e.error}`;
+      if (msg) setMessages((p) => [...p, { role: "assistant", content: msg }]);
+      stopListening();
+    };
+    rec.onend = () => stopListening();
+
+    recognitionRef.current = rec;
+    try {
+      rec.start();
+      setIsListening(true);
+    } catch (err) {
+      console.error("[VOICE] Start error:", err);
+      setIsListening(false);
+    }
+  };
 
   const quickActions = user?.role === "faculty"
     ? [{ label: "My courses", msg: "show my courses" }, { label: "Absence report", msg: "absence report" }, { label: "News", msg: "university news" }]
@@ -108,8 +200,9 @@ export default function ChatWidget({ token: externalToken, user: externalUser })
         {messages.length <= 1 && <div className="px-3 pb-1 flex flex-wrap gap-1.5 justify-center">
           {quickActions.map((a) => <button key={a.label} onClick={() => handleSend(a.msg)} className="px-2.5 py-1 bg-sara-50 hover:bg-sara-100 border border-sara-200 text-sara-700 text-[11px] rounded-full transition-all">{a.label}</button>)}
         </div>}
-        <div className="border-t border-gray-100 px-3 py-2.5 flex items-end gap-2 flex-shrink-0">
-          <textarea ref={inputRef} value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={handleKeyDown} placeholder="Ask a question..." rows={1} className="flex-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm resize-none focus:outline-none focus:ring-2 focus:ring-sara-400" style={{ maxHeight: "80px" }} onInput={(e) => { e.target.style.height = "auto"; e.target.style.height = Math.min(e.target.scrollHeight, 80) + "px"; }} />
+        <div className="border-t border-gray-100 px-3 py-2.5 flex items-end gap-1.5 flex-shrink-0">
+          <textarea ref={inputRef} value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={handleKeyDown} placeholder={isListening ? "Listening..." : "Ask a question..."} rows={1} className={`flex-1 px-3 py-2 bg-gray-50 border rounded-xl text-sm resize-none focus:outline-none focus:ring-2 focus:ring-sara-400 ${isListening ? "border-red-300 bg-red-50/30" : "border-gray-200"}`} style={{ maxHeight: "80px" }} onInput={(e) => { e.target.style.height = "auto"; e.target.style.height = Math.min(e.target.scrollHeight, 80) + "px"; }} />
+          <button onClick={toggleListening} className={`p-2.5 rounded-xl transition-all active:scale-95 ${isListening ? "bg-red-500 hover:bg-red-600 text-white animate-pulse" : "bg-gray-100 hover:bg-gray-200 text-gray-600"}`} title={isListening ? "Stop" : "Voice input"}><svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 18.75a6 6 0 0 0 6-6v-1.5m-6 7.5a6 6 0 0 1-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 0 1-3-3V4.5a3 3 0 1 1 6 0v8.25a3 3 0 0 1-3 3Z" /></svg></button>
           <button onClick={() => handleSend()} disabled={!input.trim() || isTyping} className="p-2.5 bg-sara-600 hover:bg-sara-700 disabled:bg-gray-200 text-white rounded-xl transition-colors active:scale-95"><svg className="w-4 h-4 rotate-180" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 12 3.269 3.125A59.769 59.769 0 0 1 21.485 12 59.768 59.768 0 0 1 3.27 20.875L5.999 12Zm0 0h7.5" /></svg></button>
         </div>
       </>)}
