@@ -91,7 +91,7 @@ export class GeminiProvider extends BaseAIProvider {
         { role: "model", parts: modelParts },
         { role: "user", parts: resultParts },
       ],
-      generationConfig: { temperature: 0.3, maxOutputTokens: 1024 },
+      generationConfig: { temperature: 0.3, maxOutputTokens: 2048 },
       safetySettings: this._safetySettings(),
     };
 
@@ -136,7 +136,7 @@ export class GeminiProvider extends BaseAIProvider {
     return [
       "Role: " + (context.role === "student" ? "student" : "faculty"),
       "Name: " + context.userName,
-      "IMPORTANT: Always respond in English only.",
+      "IMPORTANT: Reply in the same language the user writes in. Arabic question → Arabic answer. English question → English answer.",
     ].join("\n");
   }
 
@@ -155,7 +155,7 @@ export class GeminiProvider extends BaseAIProvider {
       context.role === "student" ? "Role: student" : "Role: faculty",
       "Name: " + context.userName,
       "Data type: " + context.dataType,
-      "IMPORTANT: Always respond in English only.",
+      "IMPORTANT: Reply in the same language the user writes in. Arabic question → Arabic answer. English question → English answer.",
       "Available data:\n" + JSON.stringify(context.data, null, 2),
     ].join("\n");
   }

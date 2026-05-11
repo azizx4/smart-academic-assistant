@@ -18,7 +18,7 @@ const FACULTY_ACTIONS = [
   { label: "News", message: "University news" },
 ];
 
-export default function QuickActions({ role, onSelect }) {
+export default function QuickActions({ role, onSelect, disabled }) {
   const actions = role === "faculty" ? FACULTY_ACTIONS : STUDENT_ACTIONS;
 
   return (
@@ -27,7 +27,8 @@ export default function QuickActions({ role, onSelect }) {
         <button
           key={action.label}
           onClick={() => onSelect(action.message)}
-          className="px-3.5 py-1.5 bg-sara-50 hover:bg-sara-100 border border-sara-200 text-sara-700 text-xs font-medium rounded-full transition-all hover:shadow-sm active:scale-95"
+          disabled={disabled}
+          className="px-3.5 py-1.5 bg-sara-50 hover:bg-sara-100 disabled:opacity-50 border border-sara-200 text-sara-700 text-xs font-medium rounded-full transition-all hover:shadow-sm active:scale-95"
         >
           {action.label}
         </button>

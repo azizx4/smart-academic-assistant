@@ -197,9 +197,9 @@ export default function ChatWidget({ token: externalToken, user: externalUser, l
           {isTyping && <TypingIndicator />}
           <div ref={messagesEndRef} />
         </div>
-        {messages.length <= 1 && <div className="px-3 pb-1 flex flex-wrap gap-1.5 justify-center">
-          {quickActions.map((a) => <button key={a.label} onClick={() => handleSend(a.msg)} className="px-2.5 py-1 bg-sara-50 hover:bg-sara-100 border border-sara-200 text-sara-700 text-[11px] rounded-full transition-all">{a.label}</button>)}
-        </div>}
+        <div className="px-3 pb-1 flex flex-wrap gap-1.5 justify-center">
+          {quickActions.map((a) => <button key={a.label} onClick={() => handleSend(a.msg)} disabled={isTyping} className="px-2.5 py-1 bg-sara-50 hover:bg-sara-100 disabled:opacity-50 border border-sara-200 text-sara-700 text-[11px] rounded-full transition-all">{a.label}</button>)}
+        </div>
         <div className="border-t border-gray-100 px-3 py-2.5 flex items-end gap-1.5 flex-shrink-0">
           <textarea ref={inputRef} value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={handleKeyDown} placeholder={isListening ? "Listening..." : "Ask a question..."} rows={1} className={`flex-1 px-3 py-2 bg-gray-50 border rounded-xl text-sm resize-none focus:outline-none focus:ring-2 focus:ring-sara-400 ${isListening ? "border-red-300 bg-red-50/30" : "border-gray-200"}`} style={{ maxHeight: "80px" }} onInput={(e) => { e.target.style.height = "auto"; e.target.style.height = Math.min(e.target.scrollHeight, 80) + "px"; }} />
           <button onClick={toggleListening} className={`p-2.5 rounded-xl transition-all active:scale-95 ${isListening ? "bg-red-500 hover:bg-red-600 text-white animate-pulse" : "bg-gray-100 hover:bg-gray-200 text-gray-600"}`} title={isListening ? "Stop" : "Voice input"}><svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 18.75a6 6 0 0 0 6-6v-1.5m-6 7.5a6 6 0 0 1-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 0 1-3-3V4.5a3 3 0 1 1 6 0v8.25a3 3 0 0 1-3 3Z" /></svg></button>

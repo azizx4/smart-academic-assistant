@@ -376,13 +376,14 @@ function formatFallback(intent, data, name) {
       if (!data?.length) return `${name}, you have no absences!`;
       const LIMIT = 5;
       let t = `**Your Absences, ${name}:**\n\n`;
-      t += `| Course | Count | Status |\n`;
-      t += `| :--- | :---: | :--- |\n`;
+      t += `| Course | Count | Dates | Status |\n`;
+      t += `| :--- | :---: | :--- | :--- |\n`;
       for (const c of data) {
         const cn = `${c.courseNameEn || c.courseCode} (${c.courseCode})`;
         const abs = c.totalAbsences;
         const status = abs >= LIMIT ? "⛔ Denied" : abs >= LIMIT - 1 ? "⚠️ Risk" : "✅ OK";
-        t += `| ${cn} | ${abs} | ${status} |\n`;
+        const dates = (c.records || []).map(r => r.date.replace(/^\d{4}-/, "")).join(", ");
+        t += `| ${cn} | ${abs} | ${dates} | ${status} |\n`;
       }
       t += `\nLimit: ${LIMIT} absences per course.`;
       return t;

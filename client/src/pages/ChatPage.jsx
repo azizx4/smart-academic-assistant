@@ -123,11 +123,9 @@ export default function ChatPage() {
       </div>
 
       {/* Quick Actions */}
-      {showQuickActions && messages.length <= 1 && (
-        <div className="px-4 pb-2 max-w-2xl mx-auto w-full">
-          <QuickActions role={user.role} onSelect={handleSend} />
-        </div>
-      )}
+      <div className="px-4 pb-2 max-w-2xl mx-auto w-full">
+        <QuickActions role={user.role} onSelect={handleSend} disabled={isTyping} />
+      </div>
 
       {/* Input Area */}
       <div className="border-t border-sara-100 bg-white/80 backdrop-blur-md px-4 py-3 flex-shrink-0">
